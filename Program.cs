@@ -426,6 +426,7 @@ namespace flvtool
             {
                 goto ShowHelp;
             }
+            return;
 
         ShowHelp:
             Console.WriteLine("args: extract xxxx.flv xxxx.h264");
