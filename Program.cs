@@ -63,9 +63,11 @@ namespace flvtool
 
     class Nalu
     {
+        public enum NaluType { SPS = 0, PPS, OTHER }
         public uint offset;
         public uint len;
         public byte[] data;
+        public NaluType type;
     }
 
     class NaluHash
@@ -189,6 +191,7 @@ namespace flvtool
                         while(ms.Position < ms.Length)
                         {
                             Nalu nalu = new Nalu();
+                            nalu.type = Nalu.NaluType.OTHER;
                             nalu.offset = offset;
 
                             uint len = ms.ReadU32BE();
@@ -238,6 +241,7 @@ namespace flvtool
                         for (int i = 0; i < spscount; ++i)
                         {
                             Nalu nalu = new Nalu();
+                            nalu.type = Nalu.NaluType.SPS;
                             nalu.offset = offset;
 
                             uint spslen = ms.ReadU16BE();
@@ -256,6 +260,7 @@ namespace flvtool
                         for (int i = 0; i < ppscount; ++i)
                         {
                             Nalu nalu = new Nalu();
+                            nalu.type = Nalu.NaluType.PPS;
                             nalu.offset = offset;
 
                             uint ppslen = ms.ReadU16BE();
@@ -360,6 +365,33 @@ namespace flvtool
             fso.Close();
         }
 
+        public void ExtractAVCs(string input, string output)
+        {
+            var fs = new FileStream(input, FileMode.Open);
+            int index = 0;
+
+            //var fso = new FileStream(output, FileMode.Create);
+            FileStream fso = null;
+
+            var nalus = GetAllNalus(fs);
+            while(nalus.MoveNext())
+            {
+                if (fso == null || nalus.Current.type == Nalu.NaluType.SPS)
+                {
+                    ++index;
+                    if (fso != null)
+                        fso.Close();
+                    fso = new FileStream(output + "_" + index.ToString() + ".h264", FileMode.Create);
+                }
+                fso.Write(nalus.Current.data, 0, nalus.Current.data.Length);
+            }
+
+            fs.Close();
+
+            if (fso != null)
+                fso.Close();
+        }
+
         public void AVCTrace(string target, string[] sources)
         {
             var dict = new Dictionary<string, NaluHash>();
@@ -406,6 +438,10 @@ namespace flvtool
                     {
                         x.ExtractAVC(args[1], args[2]);
                     }
+                    else if (args[0] == "extractseg")
+                    {
+                        x.ExtractAVCs(args[1], args[2]);
+                    }
                     else if (args[0] == "trace")
                     {
                         x.AVCTrace(args[1], args.Skip(2).ToArray());
@@ -431,6 +467,9 @@ namespace flvtool
         ShowHelp:
             Console.WriteLine("args: extract xxxx.flv xxxx.h264");
             Console.WriteLine("    for work around ffmpeg's extraction bug with multiple segments H.264 in different SPS");
+            Console.WriteLine();
+            Console.WriteLine("args: extractseg xxxx.flv xxxx");
+            Console.WriteLine("    save different segments in different files. will add _1.h264 _2.h264 suffix");
             Console.WriteLine();
             Console.WriteLine("args: trace joined.flv src1.flv src2.flv ...");
             Console.WriteLine("    for debug RTMP server's stream repeating");
