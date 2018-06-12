@@ -372,6 +372,7 @@ namespace flvtool
 
             //var fso = new FileStream(output, FileMode.Create);
             FileStream fso = null;
+            byte[] curSPS = null;
 
             var nalus = GetAllNalus(fs);
             while(nalus.MoveNext())
@@ -379,9 +380,15 @@ namespace flvtool
                 if (fso == null || nalus.Current.type == Nalu.NaluType.SPS)
                 {
                     ++index;
-                    if (fso != null)
-                        fso.Close();
-                    fso = new FileStream(output + "_" + index.ToString() + ".h264", FileMode.Create);
+
+                    if (curSPS == null || curSPS.SequenceEqual(nalus.Current.data) == false)
+                    {
+                        curSPS = nalus.Current.data;
+                        
+                        if (fso != null)
+                            fso.Close();
+                        fso = new FileStream(output + "_" + index.ToString() + ".h264", FileMode.Create);
+                    }
                 }
                 fso.Write(nalus.Current.data, 0, nalus.Current.data.Length);
             }
